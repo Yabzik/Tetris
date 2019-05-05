@@ -242,8 +242,8 @@ int main() {
 	initPiece(pieceNext, width);
 	drawNext(pieceNext, width);
 
-	using Framerate = chrono::duration<chrono::steady_clock::rep, ratio<1, 4>>;
-	auto next = chrono::steady_clock::now() + Framerate{ 1 };
+	using Framerate = chrono::duration<chrono::steady_clock::rep, ratio<1, 8>>;
+	auto next = chrono::steady_clock::now() + Framerate{ 4 };
 	while (1)
 	{
 		while (chrono::steady_clock::now() < next) {
@@ -263,7 +263,7 @@ int main() {
 				}
 			}
 			if (GetAsyncKeyState(VK_DOWN) == -32767 && !paused) {
-				next -= Framerate{ 1 };
+				next -= Framerate{ 2 };
 			}
 			if (GetAsyncKeyState(VK_UP) == -32767 && !paused) {
 				rotatePiece(pieceCurrent, pole, width, height);
@@ -304,6 +304,7 @@ int main() {
 				else { 
 					setlocale(LC_ALL, "C");
 					system("cls");
+					score = 0;
 					setColor(White, Black);
 					setAr(pole, width, height);
 					drawArRect(2, 2, pole, width, height);
@@ -317,7 +318,10 @@ int main() {
 		}
 		checkLines(pole, width, height, score);
 		drawPiece(pieceCurrent);
-		next += Framerate{ 2 };
+		next += Framerate{ 4 };
+		if (score >= 700) {
+			next -= Framerate{ 1 };
+		}
 	}
 
 
@@ -868,14 +872,3 @@ void animateLine(int** mas, int width, int height, int line) {
 	}
 	setColor(White, Black);
 }
-/*
-+Фигурнки выпадают разного цвета. Сбоку "стакана" отображается фигурка, которая появится следующей.
-+Должна быть возможность вращать фигурки, нажимая на стрелку "вверх".
-+При нажатии стрелки "вниз" фигурка начинает перемещаться на одну клетку "быстрее", т.е. увеличивается расстояние перемещения за один шаг.
-+При дохождении текущей фигурки до ограничительной линии (низ "стакана" или стоящая на "стакане" фигурка) она останавливается и сверху "стакана" выезжает следующая фигурка.
-+Если была собрана разноцветная линия - счёт увеличивается на 100 очков.
-+Если была собрана линия одного цвета - +200 очков.
-При достижении счёта 700 очков скорость фигурки увеличивается - теперь она смещается на две клетки.
-+Если был собран столбец до верха стаканы игра закончена. ПРОИГРЫШ.
-При нажатии ESC должна быть возможность поставить игру на паузу.
-+При запуске приложения появляется меню, в котором можно запустить игру с настройками по умолчанию или задать размеры стакана самостоятельно.*/
