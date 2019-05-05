@@ -463,6 +463,7 @@ void customDim(int& width, int& height) {
 }
 void menu(int& width, int& height) {
 	showConsoleCursor(false);
+	SetConsoleTitle(L"Tetris");
 	setColor(Red, Black);
 	cout << logo;
 	setColor(White, Black);
