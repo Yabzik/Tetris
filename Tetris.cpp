@@ -169,6 +169,13 @@ const int pieces[7][4][4][4] = {
 	{0, 1, 1, 0},
 	{0, 1, 0, 0}}}
 };
+bool paused;
+
+//сохранение
+void saveGame(int width, int height, int **pole, piece current, piece next, int score);
+void loadGame(int &width, int &height, int** &pole, piece &current, piece &next, int &score);
+bool checkForSave();
+bool loadMenu();
 
 //Отрисовка прямоугольника
 void drawRect(int x, int y, int w, int h);
@@ -186,7 +193,7 @@ void setPiece(piece & piece);
 void initPiece(piece & piece, int width);
 bool checkCollision(piece piece, int** mas, int dir, int width, int height);
 void mergePiece(piece piece, int** mas);
-void rotatePiece(piece & piece, int** mas, int width, int height);
+void rotatePiece(piece &piece, int** mas, int width, int height);
 
 //Очистка внутри прямоугольника
 void clearInRect(int x, int y, int w, int h);
@@ -195,11 +202,18 @@ void clearInRect(int x, int y, int w, int h);
 void customDim(int& width, int& height);
 void menu(int& width, int& height);
 bool gameOver();
+void printHelp(int width);
+void clearHelp(int width);
+void printPause(int width);
+void clearPause(int width);
 
 //Работа с массивом поля
 void setAr(int** mas, int width, int height);
 void checkLines(int** mas, int width, int height, int& score);
 void animateLine(int** mas, int width, int height, int line);
+void copyAr(int** a, int** b, int width, int height);
+
+void pause(bool state, chrono::time_point<chrono::steady_clock> &next);
 
 Color getRand();
 
@@ -220,26 +234,44 @@ const char* logo = R"(       _            _          _            _            _
 int main() {
 	srand(time(NULL));
 	int width, height, score = 0;
-	bool paused = false;
-	menu(width, height);
+	piece pieceCurrent;
+	piece pieceNext;
+	paused = false;
+	bool saved = false;
 
-	int** pole = new int* [height];
-	for (size_t i = 0; i < height; i++)
-	{
-		pole[i] = new int[width];
+	int** pole=new int*[1];
+	if (checkForSave() && loadMenu()) {
+		saved = true;
+		delete[]pole;
+		loadGame(width, height, pole, pieceCurrent, pieceNext, score);
+		showConsoleCursor(false);
+		remove("save");
 	}
-	setAr(pole, width, height);
+
+	if (!saved) {
+		menu(width, height);
+		delete[]pole;
+		pole = new int* [height];
+		for (size_t i = 0; i < height; i++)
+		{
+			pole[i] = new int[width];
+		}
+		setAr(pole, width, height);
+	}
+	
 	drawArRect(2, 2, pole, width, height);
 	drawRect(10 + width, 2, 8, 6);
 	setCursor(25 + width, 3);
 	setlocale(LC_ALL, "rus");
 	cout << "Счет: " << score;
+	setCursor(25 + width, 5);
+	cout << "F1 - помощь";
 	setlocale(LC_ALL, "С");
 
-	piece pieceCurrent;
-	initPiece(pieceCurrent, width);
-	piece pieceNext;
-	initPiece(pieceNext, width);
+	if (!saved) {
+		initPiece(pieceCurrent, width);
+		initPiece(pieceNext, width);
+	}
 	drawNext(pieceNext, width);
 
 	using Framerate = chrono::duration<chrono::steady_clock::rep, ratio<1, 8>>;
@@ -270,14 +302,25 @@ int main() {
 				drawArRect(2, 2, pole, width, height);
 				drawPiece(pieceCurrent);
 			}
-			if (GetAsyncKeyState(VK_ESCAPE) == -32767) { 
+			if (GetAsyncKeyState(VK_F1) == -32767) {
 				if (!paused) {
-					next += Framerate{ MAXINT }; 
-					paused = true;
+					pause(true, next);
+					printHelp(width);
 				}
 				else {
-					next = chrono::steady_clock::now();
-					paused = false;
+					clearHelp(width);
+					pause(false, next);
+				}
+			}
+			if (GetAsyncKeyState(VK_ESCAPE) == -32767) { 
+				if (!paused) {
+					saveGame(width, height, pole, pieceCurrent, pieceNext, score);
+					pause(true, next);	
+					printPause(width);
+				}
+				else {
+					clearPause(width);
+					pause(false, next);
 				}
 			}
 			//------------------GAME CYCLE ------------------
@@ -298,7 +341,6 @@ int main() {
 			}
 			else {
 				if (gameOver()) {
-					//system("pause");
 					return 0;
 				}
 				else { 
@@ -329,8 +371,189 @@ int main() {
 	return 0;
 }
 
+bool loadMenu() {
+	drawRect(25, 13, 25, 8);
+	setlocale(LC_ALL, "rus");
+	setCursor(27, 15);
+	cout << "Обнаружено сохранение!";
+	setCursor(27, 17);
+	setColor(Black, White);
+	cout << "Загрузиться";
+	setColor(White, Black);
+	setCursor(27, 18);
+	cout << "Играть заново";
+
+	setCursor(0, 0);
+
+	int pos = 0;
+
+	while (1) {
+		if (_kbhit()) {
+			switch (_getch())
+			{
+			case Up:
+			case Down:
+				if (pos) {
+					pos = 0;
+				}
+				else {
+					pos = 1;
+				}
+				break;
+			case Enter:
+				if (!pos)
+				{//load
+					system("cls");
+					setlocale(LC_ALL, "C");
+					return true;
+				}
+				else { //create new
+					system("cls");
+					setlocale(LC_ALL, "C");
+					return false;
+				}
+				break;
+			default:
+				break;
+			}
+
+
+			clearInRect(25, 13, 25, 8);
+
+			setCursor(27, 15);
+			cout << "Обнаружено сохранение!";
+			setCursor(27, 17);
+			if (!pos)
+			{
+				setColor(Black, White);
+			}
+			else {
+				setColor(White, Black);
+			}
+			cout << "Загрузиться";
+			setCursor(27, 18);
+			if (pos)
+			{
+				setColor(Black, White);
+			}
+			else {
+				setColor(White, Black);
+			}
+			cout << "Играть заново";
+			setColor(White, Black);
+			setCursor(0, 0);
+		}
+	}
+}
+bool checkForSave() {
+	bool isPresent;
+	FILE* f;
+	if (fopen_s(&f, "save", "rb")) {
+		isPresent = false;
+	}
+	else {
+		isPresent = true;
+		fclose(f);
+	}
+	return isPresent;
+}
+void saveGame(int width, int height, int** pole, piece current, piece next, int score) {
+	FILE* f;
+	fopen_s(&f, "save", "wb");
+	fwrite(&width, sizeof(width), 1, f);
+	fwrite(&height, sizeof(height), 1, f);
+	for (size_t y = 0; y < height; y++)
+	{
+		for (size_t x = 0; x < width; x++)
+		{
+			fwrite(&pole[y][x], sizeof(pole[y][x]), 1, f);
+		}	
+	}
+	fwrite(&current, sizeof(current), 1, f);
+	fwrite(&next, sizeof(current), 1, f);
+	fwrite(&score, sizeof(score), 1, f);
+
+	fclose(f);
+}
+void loadGame(int &width, int &height, int** &pole, piece &current, piece &next, int &score) {
+	FILE* f;
+	fopen_s(&f, "save", "rb");
+
+	fread(&width, sizeof(width), 1, f);
+	fread(&height, sizeof(height), 1, f);
+
+	pole = new int* [height];
+	for (size_t i = 0; i < height; i++)
+	{
+		pole[i] = new int[width];
+	}
+
+	for (size_t y = 0; y < height; y++)
+	{
+		for (size_t x = 0; x < width; x++)
+		{
+			fread(&pole[y][x], sizeof(pole[y][x]), 1, f);
+		}
+	}
+	fread(&current, sizeof(current), 1, f);
+	fread(&next, sizeof(next), 1, f);
+	fread(&score, sizeof(score), 1, f);
+	fclose(f);
+}
+void copyAr(int** a, int** b, int width, int height) {
+	for (size_t y = 0; y < height; y++)
+	{
+		for (size_t x = 0; x < width; x++)
+		{
+			b[y][x] = a[y][x];
+		}
+	}
+}
 Color getRand() {
 	return (Color)(1 + (rand() % 15));
+}
+void pause(bool state, chrono::time_point<chrono::steady_clock> &next) {
+	using Framerate = chrono::duration<chrono::steady_clock::rep, ratio<10, 1>>;
+	if (!paused) {
+		next += Framerate{ MAXINT };
+		paused = true;
+	}
+	else {
+		next = chrono::steady_clock::now();
+		paused = false;
+	}
+}
+void printPause(int width) {
+	drawRect(10 + width, 10, 25, 5);
+	setlocale(LC_ALL, "rus");
+	setCursor(11 + width, 11);
+	cout << "Вы приостановили игру!";
+	setCursor(11 + width, 12);
+	cout << "Текущее состояние игры";
+	setCursor(11 + width, 13);
+	cout << "было сохранено";
+	setlocale(LC_ALL, "C");
+}
+void clearPause(int width) {
+	clearInRect(9 + width, 9, 27, 7);
+}
+void printHelp(int width) {
+	drawRect(10 + width, 10, 40, 6);
+	setlocale(LC_ALL, "rus");
+	setCursor(11 + width, 11);
+	cout << "Стрелки вправо, влево - перемещение";
+	setCursor(11 + width, 12);
+	cout << "Вверх - поворот";
+	setCursor(11 + width, 13);
+	cout << "Вниз - ускорение";
+	setCursor(11 + width, 14);
+	cout << "Esc - пауза";
+
+
+	setlocale(LC_ALL, "C");
+}
+void clearHelp(int width) {
+	clearInRect(9 + width, 9, 42, 8);
 }
 void drawRect(int x, int y, int w, int h) {
 	const char TB = '\xCD'; // 205
